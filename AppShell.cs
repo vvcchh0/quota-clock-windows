@@ -18,7 +18,8 @@ namespace QuotaClock
 {
     public sealed class Preferences
     {
-        public int Version = 4;
+        public int Version = 5;
+        public bool RecordRun=true, HourTrail=true, MinuteTrail=true, FineTrail=true;
         public int RefreshSeconds = 15;
         public bool ShowTrail = true, TrailLeft;
         public bool EstimateFine = true, ReuseConnection = true;
@@ -40,7 +41,7 @@ namespace QuotaClock
                 else if (map.ContainsKey("light")) result.Theme = Convert.ToBoolean(map["light"]) ? "light" : "dark";
             }
             catch { }
-            result.Version=4;
+            result.Version=5;
             result.RefreshSeconds = Math.Max(5, Math.Min(1800, result.RefreshSeconds));
             result.OrbSize = Math.Max(140, Math.Min(320, result.OrbSize));
             result.OrbOpacity = Math.Max(.35, Math.Min(1, result.OrbOpacity));
@@ -76,6 +77,10 @@ namespace QuotaClock
         double demoStart, demoConsumed;
         int failures,readSuccesses;
         public readonly TrailHistory History = new TrailHistory();
+        public readonly RunRecording Recording;
+        RunHistoryWindow runHistory;
+        public bool HasRunHistory {get{return runHistory!=null;}}
+        public int TrailMask {get{return (Prefs.HourTrail?1:0)|(Prefs.MinuteTrail?2:0)|(Prefs.FineTrail?4:0);}}
         public Snapshot Snapshot;
         public QuotaWindow Selected;
         public string Error;
@@ -134,6 +139,8 @@ namespace QuotaClock
         {
             Preview = preview; Prefs = preview ? new Preferences { Theme = "light" } : Preferences.Load();
             Demo = preview;
+            Recording=new RunRecording(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"history"),Prefs.RecordRun&&!preview,!preview);
+            History.Sampled+=delegate(TrailPoint point,string key){if(!Demo)Recording.Record(point,key);};
             Orb = new OrbWindow(this);
             saveTimer.Interval = TimeSpan.FromMilliseconds(350);
             saveTimer.Tick += delegate { saveTimer.Stop(); if (!Preview) Prefs.Save(); };
@@ -162,6 +169,7 @@ namespace QuotaClock
                 tray.DoubleClick += delegate { Dispatch(ShowDetails); };
                 var menu = new Forms.ContextMenuStrip();
                 menu.Items.Add("额度详情", null, delegate { Dispatch(ShowDetails); });
+                menu.Items.Add("三针运行轨迹",null,delegate{Dispatch(ShowRunHistory);});
                 menu.Items.Add("设置", null, delegate { Dispatch(ShowSettings); });
                 menu.Items.Add("显示 / 隐藏悬浮表盘", null, delegate { Dispatch(delegate { Prefs.ShowOrb = !Prefs.ShowOrb; ApplyPreferences(); }); });
                 menu.Items.Add("刷新额度", null, delegate { Dispatch(delegate { Demo = false; var task = Refresh(); }); });
@@ -219,11 +227,12 @@ namespace QuotaClock
             finally { Busy = false; if(Demo||!Prefs.ReuseConnection||Prefs.RefreshSeconds>60)client.ReleaseIdle(); if (!Exiting) Notify(); }
         }
         public void Select(QuotaWindow w) { Selected = w; Prefs.SelectedId = w.Id; if(meter!=null)meter.Observe(w,Snapshot.Fetched); Notify(); Save(); }
-        public void SetDemo(bool value) { Demo = value; if(!value)WaveDemoPlaying=false;else client.ReleaseIdle(); if(started)ConfigureMeter(); Notify(); if (!value && Snapshot == null) { var task = Refresh(); } }
+        public void SetDemo(bool value) { Demo = value;Recording.SetEnabled(Prefs.RecordRun&&!value); if(!value)WaveDemoPlaying=false;else client.ReleaseIdle(); if(started)ConfigureMeter(); Notify(); if (!value && Snapshot == null) { var task = Refresh(); } }
         void CaptureTrail()
         {
-            bool valid=Known && Fine && !Expired && (Error==null || Snapshot!=null && DateTimeOffset.Now-Snapshot.Fetched<TimeSpan.FromMinutes(2));
-            History.Capture(TrailHistory.Now,PositionRemaining,valid,Estimated,Demo?"demo":Selected==null?"unknown":Selected.Id+":"+Selected.Reset);
+            bool coarse=Known && !Expired && (Error==null || Snapshot!=null && DateTimeOffset.Now-Snapshot.Fetched<TimeSpan.FromMinutes(2));
+            bool valid=coarse && Fine;
+            History.Capture(TrailHistory.Now,PositionRemaining,valid,Estimated,Demo?"demo":Selected==null?"unknown":Selected.Id+":"+Selected.Reset,coarse);
         }
         public void SetWaveDemo(bool playing)
         {
@@ -236,9 +245,10 @@ namespace QuotaClock
         {
             if (Exiting) return;
             if(!Preview && (!Prefs.ReuseConnection||Prefs.RefreshSeconds>60))client.ReleaseIdle();
+            Recording.SetEnabled(Prefs.RecordRun&&!Demo);
             Orb.Apply();
             if (Prefs.ShowOrb) { if (!Orb.IsVisible) Orb.Show(); } else Orb.Hide();
-            if(details!=null)details.ApplyTheme(); if(settings!=null)settings.ApplyTheme();
+            if(details!=null)details.ApplyTheme(); if(settings!=null)settings.ApplyTheme();if(runHistory!=null)runHistory.ApplyTheme();
             if(started)ConfigureMeter();
             if (Taskbar != null) Taskbar.Apply();
             Notify(); Save();
@@ -264,14 +274,25 @@ namespace QuotaClock
             Details.Show(); Details.WindowState = WindowState.Normal; Details.Activate();
             WriteStatus();
         }
+        public void ShowRunHistory()
+        {
+            if(Exiting)return;if(runHistory==null)runHistory=new RunHistoryWindow(this);
+            runHistory.Show();runHistory.WindowState=WindowState.Normal;runHistory.Activate();WriteStatus();
+        }
+        public RunHistoryWindow RunWindow {get{return runHistory;}}
+        public void ForgetRunHistory(RunHistoryWindow value){if(runHistory==value)runHistory=null;WriteStatus();}
+        public void SetTrailHand(int hand,bool visible)
+        {
+            if(hand==0)Prefs.HourTrail=visible;else if(hand==1)Prefs.MinuteTrail=visible;else Prefs.FineTrail=visible;ApplyPreferences();
+        }
         public void ShowSettings() { if (Exiting) return; SettingsOpenCount++; Settings.Show(); Settings.WindowState = WindowState.Normal; Settings.Activate(); WriteStatus(); }
         public ContextMenu Menu()
         {
             var menu = new ContextMenu(); UI.Theme(menu, Light);
             Action<string, Action> add = (label, action) => { var item = new MenuItem { Header = label }; item.Click += delegate { action(); }; menu.Items.Add(item); };
-            add("额度详情", ShowDetails); add("设置", ShowSettings);
+            add("额度详情", ShowDetails);add("三针运行轨迹",ShowRunHistory); add("设置", ShowSettings);
             add(Prefs.ShowOrb ? "隐藏悬浮表盘" : "显示悬浮表盘", delegate { Prefs.ShowOrb = !Prefs.ShowOrb; ApplyPreferences(); });
-            add(Prefs.ShowTrail ? "隐藏秒针轨迹" : "显示秒针轨迹", delegate { Prefs.ShowTrail = !Prefs.ShowTrail; ApplyPreferences(); });
+            add(Prefs.ShowTrail ? "隐藏三针轨迹" : "显示三针轨迹", delegate { Prefs.ShowTrail = !Prefs.ShowTrail; ApplyPreferences(); });
             add("刷新额度", delegate { Demo = false; var task = Refresh(); });
             menu.Items.Add(new Separator()); add("退出额度时钟", Exit);
             return menu;
@@ -282,7 +303,7 @@ namespace QuotaClock
             try
             {
                 string json = new JavaScriptSerializer().Serialize(new {
-                    version = "0.4.0", refreshSeconds=Prefs.RefreshSeconds, trailVisible=Prefs.ShowTrail, trailPoints=History.Points.Count,
+                    version = "0.5.0", historySamples=Recording.Timeline.Count, historyWritten=Recording.Written, historyError=Recording.Error, historyDropped=Recording.Dropped, historyWindowVisible=runHistory!=null&&runHistory.IsVisible, trailMask=TrailMask, refreshSeconds=Prefs.RefreshSeconds, trailVisible=Prefs.ShowTrail, trailPoints=History.Points.Count,
                     connectionPid=client.ProcessId, connectionStarts=client.ConnectionsStarted, readSuccesses=readSuccesses, trayVisible = tray != null && tray.Visible,
                     orbVisible = Orb.IsVisible, detailsVisible = details!=null&&details.IsVisible, settingsVisible = settings!=null&&settings.IsVisible,
                     taskbar = Taskbar == null ? "not-started" : Taskbar.Presence,
@@ -298,11 +319,11 @@ namespace QuotaClock
             }
             catch { }
         }
-        public void Exit() { if (Exiting) return; Exiting = true; Dispose(); Orb.Close(); if(details!=null)details.Close(); if(settings!=null)settings.Close(); Application.Current.Shutdown(); }
+        public void Exit() { if (Exiting) return; Exiting = true; Dispose(); Orb.Close(); if(details!=null)details.Close(); if(settings!=null)settings.Close();if(runHistory!=null)runHistory.Close(); Application.Current.Shutdown(); }
         public void Dispose()
         {
             if (disposed) return; disposed = true;
-            timer.Stop(); saveTimer.Stop(); client.Dispose(); if(meter!=null)meter.Dispose();
+            timer.Stop(); saveTimer.Stop(); client.Dispose(); if(meter!=null)meter.Dispose();Recording.Dispose();
             if (!Preview) Prefs.Save();
             if (Taskbar != null) Taskbar.Dispose();
             if (tray != null) { tray.Visible = false; tray.ContextMenuStrip.Dispose(); tray.Dispose(); }
@@ -369,7 +390,7 @@ namespace QuotaClock
             if(placed && lastLeft!=app.Prefs.TrailLeft && lastTrail && app.Prefs.ShowTrail)x=Left+(lastLeft?lastWaveWidth:0)-(app.Prefs.TrailLeft?waveWidth:0);
             Face.Width=Face.Height=size;Wave.Width=waveWidth;Wave.Height=size;
             Wave.Visibility=app.Prefs.ShowTrail?Visibility.Visible:Visibility.Collapsed;
-            Wave.Light=app.Light;Wave.Left=app.Prefs.TrailLeft;Wave.Demo=app.Demo;
+            Wave.Light=app.Light;Wave.Left=app.Prefs.TrailLeft;Wave.Demo=app.Demo;Wave.HandMask=app.TrailMask;
             layout.ColumnDefinitions[0].Width=new GridLength(app.Prefs.ShowTrail&&app.Prefs.TrailLeft?waveWidth:size);
             layout.ColumnDefinitions[1].Width=new GridLength(app.Prefs.ShowTrail?(app.Prefs.TrailLeft?size:waveWidth):0);
             Grid.SetColumn(Face,app.Prefs.ShowTrail&&app.Prefs.TrailLeft?1:0);Grid.SetColumn(Wave,app.Prefs.TrailLeft?0:1);
@@ -389,7 +410,7 @@ namespace QuotaClock
             Face.Light = app.Light; Face.Demo = app.Demo;
             Face.Estimated=app.Estimated; Face.Readout=app.Percent;
             Face.Update(app.PositionRemaining, app.Known, app.Fine, app.Expired, !app.WaveDemoPlaying);
-            Wave.Light=app.Light;Wave.Left=app.Prefs.TrailLeft;Wave.Demo=app.Demo;Wave.Advance();
+            Wave.Light=app.Light;Wave.Left=app.Prefs.TrailLeft;Wave.Demo=app.Demo;Wave.HandMask=app.TrailMask;Wave.Advance();
             Face.ToolTip = app.Source + " · 剩余 " + app.Percent + "\n" + app.ResetText + "\n" + app.PrecisionText + "\n双击查看详情 · 拖动调整位置 · 右键打开菜单";
         }
     }

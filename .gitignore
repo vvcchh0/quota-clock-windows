@@ -1,4 +1,4 @@
-# Local state and private verification data
+﻿# Local state and private verification data
 preferences.json
 preferences.json.*
 *-status.json
@@ -25,3 +25,7 @@ research-v0.4/*
 preview-*.png
 .vs/
 .idea/
+
+# Private per-run projection journals and synthetic test output
+history/
+test-output/

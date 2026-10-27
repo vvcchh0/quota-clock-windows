@@ -77,7 +77,7 @@ namespace QuotaClock
                     p.Start();active=p;Interlocked.Increment(ref starts);
                 }
                 p.ErrorDataReceived+=delegate{};p.BeginErrorReadLine();
-                Send(p,new{id=1,method="initialize",@params=new{clientInfo=new{name="quota_clock",title="Quota Clock",version="0.4.0"}}});
+                Send(p,new{id=1,method="initialize",@params=new{clientInfo=new{name="quota_clock",title="Quota Clock",version="0.5.0"}}});
                 await Reply(p,1).ConfigureAwait(false);
                 Send(p,new{method="initialized",@params=new{}});
                 nextId=2;lastTrim=DateTime.MinValue;

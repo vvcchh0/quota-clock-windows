@@ -13,3 +13,11 @@ Each observation followed a 30-second warmup and lasted about 130 seconds with n
 Most savings come from avoiding repeated native CLI startup. Private commit remains a real cost: working-set reclamation makes resident pages reclaimable, not all private allocations disappear. The app applies that only to its own idle child, at completed reads; it retires a connection above 96 MiB private cache or after 120 reads. The observation window did not reach the 120-read cap; synthetic transport tests cover rotation, oversized cache, timeout and recovery.
 
 These short measurements are useful local observations, not a long-running soak test or a guarantee for other machines.
+
+## Version 0.5 recording and three curves
+
+The full-run journal appends in the background and keeps a bounded 4096-sample recent cache, 2048 summary buckets and bounded file checkpoints. A synthetic 100000-sample test verifies complete coverage and preserved extrema within those limits. Closed history windows do not render or scan old records. Visible history redraws on new data or view changes; desktop scrolling remains one update per second.
+
+An initial 0.5 live measurement included opening details/settings, so it is retained as an interaction sample and is not used as a controlled background comparison. Long-running behaviour and disk-full/fault recovery still need broader real-device testing.
+
+A final 60-second check after a 30-second warmup kept details/settings/history closed throughout the measured window: average process-tree CPU 0.030%, main working set 127.7 MiB, combined working set 162.3 MiB, combined private commit 159.4 MiB. Four quota reads completed with no journal error or dropped samples. This run is not a claim of lower memory than 0.4: UI/resource loading, the local calibration workload and native CLI state affect the result.

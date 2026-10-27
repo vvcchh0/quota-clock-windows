@@ -94,6 +94,7 @@ namespace QuotaClock
             foreach(var height in new[]{GridLength.Auto,GridLength.Auto,new GridLength(240),GridLength.Auto,new GridLength(1,GridUnitType.Star),GridLength.Auto,GridLength.Auto})body.RowDefinitions.Add(new RowDefinition{Height=height});
             var header=new DockPanel{Margin=new Thickness(0,0,0,8)};
             var close=UI.Glyph("\uE711","收起额度详情",Close);DockPanel.SetDock(close,Dock.Right);header.Children.Add(close);
+            var history=UI.Glyph("\uE9D9","查看三针运行轨迹",app.ShowRunHistory);history.Margin=new Thickness(0,0,8,0);DockPanel.SetDock(history,Dock.Right);header.Children.Add(history);
             header.Children.Add(UI.Text("额度概览",22,true));body.Children.Add(header);
             source.Margin=new Thickness(0,0,0,4);Grid.SetRow(source,1);body.Children.Add(source);
             face.ShowReadout=true;Grid.SetRow(face,2);body.Children.Add(face);
@@ -238,9 +239,14 @@ namespace QuotaClock
             {
                 Toggle("\uEA3A","显示悬浮表盘","在桌面上显示独立的圆形额度时钟。",app.Prefs.ShowOrb,delegate(bool v){app.Prefs.ShowOrb=v;});
                 Toggle("\uE718","始终置顶","让表盘保持在其他窗口上方。",app.Prefs.Topmost,delegate(bool v){app.Prefs.Topmost=v;});
-                Toggle("\uE9D9","秒针轨迹","固定纵向投影；每 15 秒采样，每格五分钟，历史宽度十五分钟。",app.Prefs.ShowTrail,delegate(bool v){app.Prefs.ShowTrail=v;});
+                Toggle("\uE9D9","三针轨迹","时、分、秒纵向投影；桌面显示最近十五分钟。",app.Prefs.ShowTrail,delegate(bool v){app.Prefs.ShowTrail=v;});
+                Toggle("\uE823","时针投影","低频的额度变化轨迹。",app.Prefs.HourTrail,delegate(bool v){app.Prefs.HourTrail=v;});
+                Toggle("\uE823","分针投影","每消耗 10% 转一圈。",app.Prefs.MinuteTrail,delegate(bool v){app.Prefs.MinuteTrail=v;});
+                Toggle("\uE823","秒针投影","每消耗 1% 转一圈，估算仍以虚线标记。",app.Prefs.FineTrail,delegate(bool v){app.Prefs.FineTrail=v;});
+                Toggle("\uE74E","记录整个运行过程","每十五秒保存本地 CSV；关闭程序后保留，不上传。",app.Prefs.RecordRun,delegate(bool v){app.Prefs.RecordRun=v;});
+                page.Children.Add(Row("\uE9D9","三针运行轨迹","缩放、回看整次运行，或打开以前的记录。",UI.Button("查看全部",app.ShowRunHistory)));
                 Toggle("\uE8AB","历史向左滚动","镜像放到表盘左侧；关闭时历史向右滚动。",app.Prefs.TrailLeft,delegate(bool v){app.Prefs.TrailLeft=v;});
-                page.Children.Add(Row("\uE74D","清空轨迹","仅清除此刻表盘的采样历史。",UI.Button("清空",delegate{app.History.Clear();app.Notify();})));
+                page.Children.Add(Row("\uE74D","清空轨迹","仅清除桌面滚动视图，不删除运行记录。",UI.Button("清空",delegate{app.History.Clear();app.Notify();})));
                 Range("表盘大小","拖动表盘可移动位置；双击打开额度详情。",140,320,app.Prefs.OrbSize,v=>((int)v)+" px",v=>app.Prefs.OrbSize=v);
                 Range("不透明度","调整表盘的可见程度。",35,100,app.Prefs.OrbOpacity*100,v=>((int)v)+"%",v=>app.Prefs.OrbOpacity=v/100);
                 page.Children.Add(Row("\uE777","恢复默认位置","将表盘放回桌面右下方的预设位置。",UI.Button("恢复",delegate{app.Prefs.OrbLeft=Double.NaN;app.Prefs.OrbTop=Double.NaN;app.ApplyPreferences();})));
@@ -264,7 +270,7 @@ namespace QuotaClock
             }
             else
             {
-                page.Children.Add(UI.Card(UI.Text("额度时钟\nQuota Clock 0.4.0",24,true)));
+                page.Children.Add(UI.Card(UI.Text("额度时钟\nQuota Clock 0.5.0",24,true)));
                 page.Children.Add(UI.Card(UI.Text("传统十二小时表盘，将剩余额度留在视线里。\n\n指针随已消耗额度顺时针前进；时针让 0–100% 消耗走满一圈。数字与外环显示剩余额度。琥珀色虚线细针表示本地估算。",14)));
                 page.Children.Add(UI.Card(UI.Muted("参考 Agent Speed 的 WPF 桌面实现、字体层级与表盘色谱。保留上游 MIT 声明。\n\ngithub.com/zoefix/agent-speed\n\n本机保存显示偏好；额度读取由 Codex 处理。")));
             }

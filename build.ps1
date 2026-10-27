@@ -7,7 +7,7 @@ $compiler = Join-Path $frameworkDir 'csc.exe'
 $references = @('WPF\PresentationFramework.dll','WPF\PresentationCore.dll','WPF\WindowsBase.dll','System.Xaml.dll','System.Web.Extensions.dll','System.Core.dll','System.Windows.Forms.dll','System.Drawing.dll')
 $compilerArgs = @('/nologo','/target:winexe','/platform:x64','/optimize+','/utf8output',("/out:" + (Join-Path $projectDir $Output)),("/win32manifest:" + (Join-Path $projectDir 'app.manifest')))
 foreach ($reference in $references) { $compilerArgs += "/reference:$(Join-Path $frameworkDir $reference)" }
-foreach ($name in @('QuotaCore.cs','CodexClient.cs','ClientChecks.cs','WaveTrail.cs','WaveChecks.cs','LocalQuotaMeter.cs','Visuals.cs','AppShell.cs','NativeTaskbar.cs','WindowsUI.cs','Program.cs','SelfTests.cs','ShellChecks.cs','CalibrationTests.cs')) { $compilerArgs += Join-Path $projectDir $name }
+foreach ($name in @('QuotaCore.cs','CodexClient.cs','ClientChecks.cs','WaveTrail.cs','WaveChecks.cs','RunHistory.cs','RunHistoryWindow.cs','RunHistoryChecks.cs','LocalQuotaMeter.cs','Visuals.cs','AppShell.cs','NativeTaskbar.cs','WindowsUI.cs','Program.cs','SelfTests.cs','ShellChecks.cs','CalibrationTests.cs')) { $compilerArgs += Join-Path $projectDir $name }
 & $compiler @compilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'Compilation failed.' }
 $test = Start-Process -FilePath (Join-Path $projectDir $Output) -ArgumentList '--test' -WindowStyle Hidden -Wait -PassThru

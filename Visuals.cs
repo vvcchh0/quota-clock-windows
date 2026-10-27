@@ -18,8 +18,8 @@ using System.Windows.Markup;
 using System.Web.Script.Serialization;
 
 [assembly: System.Reflection.AssemblyTitle("Quota Clock")]
-[assembly: System.Reflection.AssemblyVersion("0.4.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.4.0.0")]
+[assembly: System.Reflection.AssemblyVersion("0.5.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.5.0.0")]
 
 namespace QuotaClock
 {

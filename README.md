@@ -1,6 +1,6 @@
 # Quota Clock for Windows
 
-A native Windows tray widget that turns AI quota into a three-hand clock, with a scrolling projection of the fine hand.
+A native Windows tray widget that turns AI quota into a three-hand clock, with scrolling projections of all three hands and a local full-run recorder.
 
 **[简体中文](README.zh-CN.md)** · [Performance](docs/PERFORMANCE.md) · [Related projects](docs/RELATED_PROJECTS.md) · [Privacy](docs/PRIVACY.md)
 
@@ -28,7 +28,9 @@ The fine-hand tip is projected onto a fixed vertical line. History moves away fr
 - Official quota reads every 15 seconds by default, using the signed-in local Codex app-server.
 - Reusable stdio connection, request serialization, timeout recovery and failure backoff.
 - Experimental calibrated fine hand, shown as an amber dashed hand/curve when estimated.
-- Bounded trail history: 15-second samples, one-second scrolling, cached paths and no per-frame render loop.
+- Three independently selectable projection curves: hour, minute and fine hand.
+- Local full-run CSV recording, with overview, zoom/pan, reopen and export.
+- Bounded rendering caches: 15-second samples, one-second desktop scrolling, cached paths and no per-frame render loop.
 - Explicit demo mode; missing values remain unavailable instead of being shown as full quota.
 
 ## Run
@@ -38,7 +40,7 @@ Requires Windows 10/11 x64, .NET Framework 4.8, and an installed, signed-in Code
 Build from source with the compiler included with .NET Framework:
 
 ```powershell
-.uild.ps1
+.\build.ps1
 .\QuotaClock.exe
 ```
 
@@ -46,10 +48,17 @@ No .NET SDK or NuGet packages are needed. Close an existing instance before repl
 
 - Drag the dial or history to move the widget; double-click for quota details.
 - Right-click for settings or exit. Closing details/settings keeps the tray app running.
-- **Settings → Floating window** controls history visibility and direction.
+- **Settings → Floating window** controls curve visibility, direction and local recording.
+- Open **Three-hand run history** from the tray/context menu or details icon; `QuotaClock.exe --history` also opens it. Choose the full run or 15-minute / 1-hour / 6-hour / 24-hour views, then pan back.
+- **Open record** reopens a saved CSV; **Export CSV** copies the raw samples.
+
+![Two-hour illustrative run, with hour, minute and fine-hand projections](docs/images/run-history.png)
+
+*Demo history only. Actual recording begins when this version starts; no earlier samples are reconstructed.*
+
 - **Settings → Data source → Demo mode → Play demo** seeds an explicitly labeled 15-minute sample waveform.
 
-The UI is currently Chinese. Normal history starts empty and accumulates while the app runs; it is not persisted across restarts.
+The UI is currently Chinese. The desktop tail starts fresh each run. Full-run samples are saved in a separate CSV under `history/` for each launch and remain available after exit. You can pause recording without deleting prior samples. See [the record format](docs/HISTORY.md).
 
 ## Precision and interpretation
 
@@ -68,10 +77,10 @@ The reusable CLI is retired when its private cache exceeds 96 MiB or after 120 r
 ## Test
 
 ```powershell
-.	est.ps1
+.\test.ps1
 ```
 
-101 checks cover quota parsing/mapping, calibration, trail sampling/gaps/retention, client reuse/recovery/cache limits, and window lifecycle/layout. Transport tests use a local fake CLI and do not access an account.
+140 checks cover quota parsing/mapping, calibration, trail sampling/gaps/retention, client reuse/recovery/cache limits, persistent run recording and indexed reads, long-run compaction, zoom/pan and window lifecycle/layout. Transport tests use a local fake CLI and do not access an account.
 
 ## Attribution and prior work
 
