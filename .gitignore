@@ -1,0 +1,27 @@
+# Local state and private verification data
+preferences.json
+preferences.json.*
+*-status.json
+connection-check.json
+validation-*.json
+*-results.txt
+*.log
+reuse-probe*.json
+reuse-probe-error.txt
+# Build outputs
+*.exe
+*.pdb
+*.zip
+bin/
+obj/
+dist/
+releases/
+benchmarks/
+# Local research is not part of the source release
+research-v0.3/
+research-v0.4/*
+!research-v0.4/FakeCli.cs
+# Generated previews; only curated demo images under docs/images are tracked
+preview-*.png
+.vs/
+.idea/
